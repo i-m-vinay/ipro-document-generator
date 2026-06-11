@@ -63,27 +63,14 @@ const PDFExport = {
 
     /* 6 ─ html2pdf options */
     const options = {
-      margin:   0,
-      filename: `${doc.docNumber}.pdf`,
-      image:    { type: 'jpeg', quality: 0.97 },
+      margin:      0,
+      filename:    `${doc.docNumber}.pdf`,
+      image:       { type: 'jpeg', quality: 0.98 },
       html2canvas: {
         scale:           2,
         useCORS:         true,
-        allowTaint:      true,
-        backgroundColor: '#ffffff',
         logging:         false,
-        width:           794,
-        windowWidth:     794,
-        scrollX:         0,
-        scrollY:         0,
-        onclone: (clonedDoc) => {
-          // Ensure cloned images have the same src
-          const clonedImgs = clonedDoc.querySelectorAll('img');
-          const origImgs   = container.querySelectorAll('img');
-          clonedImgs.forEach((ci, i) => {
-            if (origImgs[i]) ci.src = origImgs[i].src;
-          });
-        },
+        letterRendering: true,
       },
       jsPDF: {
         unit:        'mm',
@@ -103,8 +90,9 @@ const PDFExport = {
       Utils.showToast('PDF failed — opening print dialog.', 'warning');
       this._printFallback(doc, html);
     } finally {
-      document.body.removeChild(container);
-      document.body.removeChild(overlay);
+      if (document.body.contains(overlay)) {
+        document.body.removeChild(overlay);
+      }
     }
   },
 

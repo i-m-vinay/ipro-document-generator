@@ -539,9 +539,13 @@ const Documents = {
         </td>
         <td class="font-mono text-sm font-semibold" data-row="${idx}" data-field="amount">${Utils.formatCurrency(rowTotal)}</td>
         <td>
-          <div class="flex gap-1">
-            <button onclick="Documents.duplicateRow(${idx})" class="icon-btn text-xs" title="Duplicate">⧉</button>
-            <button onclick="Documents.deleteRow(${idx})" class="icon-btn text-red-500 text-xs" title="Delete">✕</button>
+          <div class="flex gap-2">
+            <button onclick="Documents.duplicateRow(${idx})" class="icon-btn text-xs" title="Duplicate">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+            </button>
+            <button onclick="Documents.deleteRow(${idx})" class="icon-btn text-red-500 text-xs" title="Delete">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </button>
           </div>
         </td>
       </tr>`;
@@ -722,11 +726,11 @@ const Documents = {
               Share
             </button>
             <div id="share-menu" style="display:none; position:absolute; right:0; top:44px; background:#fff; border:1px solid #E5E7EB; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.15); min-width:200px; z-index:1000; overflow:hidden;">
-              <button onclick="Documents.shareViaWhatsApp('${doc.id}')" style="display:flex; align-items:center; gap:10px; width:100%; padding:12px 16px; background:none; border:none; cursor:pointer; font-size:13px; font-weight:600; color:#111827;" onmouseover="this.style.background='#F0FDF4'" onmouseout="this.style.background='none'">
+              <button onclick="Documents.shareDocument('${doc.id}', 'whatsapp')" style="display:flex; align-items:center; gap:10px; width:100%; padding:12px 16px; background:none; border:none; cursor:pointer; font-size:13px; font-weight:600; color:#111827;" onmouseover="this.style.background='#F0FDF4'" onmouseout="this.style.background='none'">
                 <span style="font-size:18px;">📱</span> Share via WhatsApp
               </button>
               <div style="height:1px; background:#F3F4F6; margin:0 12px;"></div>
-              <button onclick="Documents.shareViaEmail('${doc.id}')" style="display:flex; align-items:center; gap:10px; width:100%; padding:12px 16px; background:none; border:none; cursor:pointer; font-size:13px; font-weight:600; color:#111827;" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background='none'">
+              <button onclick="Documents.shareDocument('${doc.id}', 'email')" style="display:flex; align-items:center; gap:10px; width:100%; padding:12px 16px; background:none; border:none; cursor:pointer; font-size:13px; font-weight:600; color:#111827;" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background='none'">
                 <span style="font-size:18px;">📧</span> Share via Email
               </button>
             </div>
@@ -774,7 +778,6 @@ const Documents = {
   toggleShareMenu() {
     const menu = Utils.el('share-menu');
     if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-    // Close on outside click
     setTimeout(() => {
       const close = (e) => {
         if (!Utils.el('share-menu-wrap')?.contains(e.target)) {
@@ -786,7 +789,7 @@ const Documents = {
     }, 50);
   },
 
-  shareViaWhatsApp(id) {
+  async shareDocument(id, method) {
     const doc      = Storage.getDocumentById(id);
     if (!doc) return;
     const settings = Storage.getSettings();
@@ -795,59 +798,102 @@ const Documents = {
     const type     = Utils.docTypeName(doc.type);
     const date     = Utils.formatDate(doc.date);
 
-    const msg = [
-      `*${settings.companyName}*`,
-      `${type}: *${doc.docNumber}*`,
-      `Date: ${date}`,
-      `Client: ${client.name || ''}${client.company ? ' (' + client.company + ')' : ''}`,
-      doc.remarks ? `Subject: ${doc.remarks}` : '',
-      `Amount: *${total}*`,
-      '',
-      `_${settings.tagline}_`,
-      `📞 ${settings.phone}  |  ✉️ ${settings.email}`,
-    ].filter(Boolean).join('\n');
-
-    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank');
+    // Hide menu immediately
     const menu = Utils.el('share-menu'); if (menu) menu.style.display = 'none';
-  },
 
-  shareViaEmail(id) {
-    const doc      = Storage.getDocumentById(id);
-    if (!doc) return;
-    const settings = Storage.getSettings();
-    const client   = Storage.getClientById(doc.clientId) || {};
-    const total    = Utils.formatCurrency(doc.totals?.grandTotal || 0);
-    const type     = Utils.docTypeName(doc.type);
-    const date     = Utils.formatDate(doc.date);
+    // Build Messages
+    let subject = '';
+    let msg = '';
+    if (method === 'whatsapp') {
+      msg = [
+        `*${settings.companyName}*`,
+        `${type}: *${doc.docNumber}*`,
+        `Date: ${date}`,
+        `Client: ${client.name || ''}${client.company ? ' (' + client.company + ')' : ''}`,
+        doc.remarks ? `Subject: ${doc.remarks}` : '',
+        `Amount: *${total}*`,
+        '',
+        `_${settings.tagline}_`,
+        `📞 ${settings.phone}  |  ✉️ ${settings.email}`,
+      ].filter(Boolean).join('\n');
+    } else {
+      subject = `${type} ${doc.docNumber} from ${settings.companyName}`;
+      msg = [
+        `Dear ${client.name || 'Sir/Madam'},`, '',
+        `Please find attached the details of your ${type.toLowerCase()}.`, '',
+        `Document No.: ${doc.docNumber}`,
+        `Date: ${date}`,
+        doc.dueDate ? `Valid Until / Due: ${Utils.formatDate(doc.dueDate)}` : '',
+        doc.remarks ? `Subject: ${doc.remarks}` : '',
+        `Grand Total: ${total}`, '',
+        `Warm regards,`,
+        `${settings.signatory || settings.companyName}`,
+        `${settings.companyName}`,
+        `📞 ${settings.phone}  |  ✉️ ${settings.email}`,
+        settings.website ? `🌐 ${settings.website}` : '',
+      ].filter(l => l !== undefined).join('\n');
+    }
 
-    const subject = encodeURIComponent(
-      `${type} ${doc.docNumber} from ${settings.companyName}`
-    );
-    const body = encodeURIComponent([
-      `Dear ${client.name || 'Sir/Madam'},`,
-      '',
-      `Please find below the details of your ${type.toLowerCase()}:`,
-      '',
-      `Document No.: ${doc.docNumber}`,
-      `Date: ${date}`,
-      doc.dueDate ? `Valid Until / Due: ${Utils.formatDate(doc.dueDate)}` : '',
-      doc.remarks ? `Subject: ${doc.remarks}` : '',
-      `Grand Total: ${total}`,
-      '',
-      'Kindly download the attached PDF for the complete document.',
-      '',
-      `Warm regards,`,
-      `${settings.signatory || settings.companyName}`,
-      `${settings.designation || ''}`,
-      `${settings.companyName}`,
-      `📞 ${settings.phone}  |  ✉️ ${settings.email}`,
-      settings.website ? `🌐 ${settings.website}` : '',
-    ].filter(l => l !== undefined).join('\n'));
+    Utils.showToast('Generating PDF for sharing...', 'info');
 
-    const to = encodeURIComponent(client.email || '');
-    window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
-    const menu = Utils.el('share-menu'); if (menu) menu.style.display = 'none';
+    try {
+      let html = Templates.generateDocumentHTML(doc);
+      const logo = Storage.getLogo();
+      const sig  = Storage.getSignature();
+      const qr   = Storage.getQRCode();
+
+      if (logo && html.includes('ipro_logo_placeholder')) html = html.replace(/ipro_logo_placeholder/g, logo);
+      if (sig && html.includes('ipro_signature_placeholder')) html = html.replace(/ipro_signature_placeholder/g, sig);
+      if (qr && html.includes('ipro_qr_placeholder')) html = html.replace(/ipro_qr_placeholder/g, qr);
+
+      const container = document.createElement('div');
+      container.innerHTML = html;
+
+      // Ensure html2pdf is available
+      if (typeof html2pdf === 'undefined') {
+        throw new Error("html2pdf library missing");
+      }
+
+      const pdfBlob = await html2pdf().from(container).set({
+        margin: 0, filename: `${doc.docNumber}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true }
+      }).outputPdf('blob');
+
+      const file = new File([pdfBlob], `${doc.docNumber}.pdf`, { type: 'application/pdf' });
+
+      // Try native share API if supported (works beautifully on mobile for PDF files)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: doc.docNumber,
+          text: msg,
+          files: [file]
+        });
+        Utils.showToast('Shared successfully!', 'success');
+      } else {
+        // Fallback for Desktop web: Download the file automatically, then open WhatsApp/Email
+        const url = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        Utils.showToast('PDF downloaded! Please attach it manually to your message.', 'warning');
+
+        setTimeout(() => {
+          if (method === 'whatsapp') {
+            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+          } else {
+            window.open(`mailto:${client.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg)}`, '_blank');
+          }
+        }, 800);
+      }
+    } catch (e) {
+      console.error('Sharing failed:', e);
+      Utils.showToast('Failed to generate PDF for sharing.', 'error');
+    }
   },
 };
 

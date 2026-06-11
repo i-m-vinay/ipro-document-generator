@@ -381,21 +381,47 @@ const Settings = {
     });
   },
 
+  /* ─── IMAGE COMPRESSION HELPER ──────────────────────────── */
+  compressImage(file, maxSizeKB, callback) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        // Scale down if larger than 800px
+        const MAX_DIM = 800;
+        if (width > height) {
+          if (width > MAX_DIM) { height *= MAX_DIM / width; width = MAX_DIM; }
+        } else {
+          if (height > MAX_DIM) { width *= MAX_DIM / height; height = MAX_DIM; }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        // Compress heavily to save localStorage quota
+        callback(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  },
+
   uploadLogo(input) {
     const file = input.files[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      Utils.showToast('Logo file must be under 2MB.', 'error');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      Storage.saveLogo(e.target.result);
-      this.render();
-      App.updateLogoInNav();
-      Utils.showToast('Logo uploaded!', 'success');
-    };
-    reader.readAsDataURL(file);
+    this.compressImage(file, 200, (base64) => {
+      try {
+        Storage.saveLogo(base64);
+        this.render();
+        App.updateLogoInNav();
+        Utils.showToast('Logo uploaded!', 'success');
+      } catch (e) {
+        Utils.showToast('Storage full! Clear old data.', 'error');
+      }
+    });
   },
 
   removeLogo() {
@@ -409,14 +435,15 @@ const Settings = {
   uploadSignature(input) {
     const file = input.files[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { Utils.showToast('Signature image must be under 2 MB.', 'error'); return; }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      Storage.saveSignature(e.target.result);
-      this.render();
-      Utils.showToast('✓ Signature uploaded! Will appear on all documents.', 'success');
-    };
-    reader.readAsDataURL(file);
+    this.compressImage(file, 200, (base64) => {
+      try {
+        Storage.saveSignature(base64);
+        this.render();
+        Utils.showToast('✓ Signature uploaded!', 'success');
+      } catch (e) {
+        Utils.showToast('Storage full! Clear old data.', 'error');
+      }
+    });
   },
 
   removeSignature() {
@@ -429,14 +456,15 @@ const Settings = {
   uploadQRCode(input) {
     const file = input.files[0];
     if (!file) return;
-    if (file.size > 1 * 1024 * 1024) { Utils.showToast('QR code image must be under 1 MB.', 'error'); return; }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      Storage.saveQRCode(e.target.result);
-      this.render();
-      Utils.showToast('✓ QR code uploaded! Will appear on invoices and quotations.', 'success');
-    };
-    reader.readAsDataURL(file);
+    this.compressImage(file, 200, (base64) => {
+      try {
+        Storage.saveQRCode(base64);
+        this.render();
+        Utils.showToast('✓ QR code uploaded!', 'success');
+      } catch (e) {
+        Utils.showToast('Storage full! Clear old data.', 'error');
+      }
+    });
   },
 
   removeQRCode() {
