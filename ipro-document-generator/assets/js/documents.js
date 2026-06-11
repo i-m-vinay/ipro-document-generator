@@ -854,12 +854,19 @@ const Documents = {
         throw new Error("html2pdf library missing");
       }
 
-      const pdfBlob = await html2pdf().from(container).set({
+      // Race condition: prevent infinite hang
+      const pdfPromise = html2pdf().from(container).set({
         margin: 0, filename: `${doc.docNumber}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true }
       }).outputPdf('blob');
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("PDF generation timed out")), 10000)
+      );
+
+      const pdfBlob = await Promise.race([pdfPromise, timeoutPromise]);
 
       const file = new File([pdfBlob], `${doc.docNumber}.pdf`, { type: 'application/pdf' });
 

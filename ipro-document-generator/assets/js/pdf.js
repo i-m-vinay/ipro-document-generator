@@ -77,7 +77,14 @@ const PDFExport = {
     };
 
     try {
-      await html2pdf().from(container).set(options).save();
+      // Race condition: if html2pdf hangs for more than 10 seconds, throw an error to trigger fallback
+      const pdfPromise = html2pdf().from(container).set(options).save();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("PDF generation timed out")), 10000)
+      );
+
+      await Promise.race([pdfPromise, timeoutPromise]);
+
       Utils.showToast(`✓ ${doc.docNumber}.pdf downloaded!`, 'success');
       Storage.logActivity?.(`PDF downloaded: ${doc.docNumber}`);
     } catch (err) {
