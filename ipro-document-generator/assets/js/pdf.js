@@ -27,8 +27,9 @@ const PDFExport = {
     if (sig && html.includes('ipro_signature_placeholder')) html = html.replace(/ipro_signature_placeholder/g, sig);
     if (qr && html.includes('ipro_qr_placeholder')) html = html.replace(/ipro_qr_placeholder/g, qr);
 
-    /* 4 ─ Delay to allow the toast to render visually */
-    await new Promise(r => setTimeout(r, 150));
+    const element = document.createElement('div');
+    element.style.width = '794px';
+    element.innerHTML = html;
 
     const options = {
       margin:      0,
@@ -37,31 +38,14 @@ const PDFExport = {
       html2canvas: {
         scale:           2,
         useCORS:         true,
-        logging:         false,
-        letterRendering: true,
-        windowWidth:     794,
-        scrollY:         0,
+        logging:         false
       },
-      jsPDF: {
-        unit:        'mm',
-        format:      'a4',
-        orientation: 'portrait',
-        compress:    true,
-      },
-      pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+      pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' }
     };
 
     try {
-      // Wrap the HTML to force exactly A4 width in pixels (794px at 96 DPI)
-      // This prevents the PDF from rendering at mobile-width and stretching/zooming the text.
-      const wrappedHtml = `
-        <div style="width: 794px; background: #fff; margin: 0; padding: 0;">
-          ${html}
-        </div>
-      `;
-
-      // Pass the raw HTML string directly to html2pdf, avoiding ALL DOM interference
-      const pdfPromise = html2pdf().from(wrappedHtml).set(options).save();
+      const pdfPromise = html2pdf().from(element).set(options).save();
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error("PDF generation timed out")), 10000)
       );

@@ -851,18 +851,17 @@ const Documents = {
         throw new Error("html2pdf library missing");
       }
 
-      const wrappedHtml = `
-        <div style="width: 794px; background: #fff; margin: 0; padding: 0;">
-          ${html}
-        </div>
-      `;
+      const element = document.createElement('div');
+      element.style.width = '794px';
+      element.innerHTML = html;
 
       // Race condition: prevent infinite hang
-      const pdfPromise = html2pdf().from(wrappedHtml).set({
+      const pdfPromise = html2pdf().from(element).set({
         margin: 0, filename: `${doc.docNumber}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true }
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+        pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' }
       }).outputPdf('blob');
       
       const timeoutPromise = new Promise((_, reject) => 
