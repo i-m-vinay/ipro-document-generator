@@ -846,16 +846,13 @@ const Documents = {
       if (sig && html.includes('ipro_signature_placeholder')) html = html.replace(/ipro_signature_placeholder/g, sig);
       if (qr && html.includes('ipro_qr_placeholder')) html = html.replace(/ipro_qr_placeholder/g, qr);
 
-      const container = document.createElement('div');
-      container.innerHTML = html;
-
       // Ensure html2pdf is available
       if (typeof html2pdf === 'undefined') {
         throw new Error("html2pdf library missing");
       }
 
       // Race condition: prevent infinite hang
-      const pdfPromise = html2pdf().from(container).set({
+      const pdfPromise = html2pdf().from(html).set({
         margin: 0, filename: `${doc.docNumber}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },

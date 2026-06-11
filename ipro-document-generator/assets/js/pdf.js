@@ -14,21 +14,8 @@ const PDFExport = {
     const originalScroll = window.scrollY;
     window.scrollTo(0, 0);
 
-    // 2. Solid, completely opaque overlay to hide the render process
-    const overlay = document.createElement('div');
-    overlay.style.cssText = [
-      'position:fixed', 'inset:0', 'background:#ffffff',
-      'z-index:9998', 'display:flex', 'align-items:center',
-      'justify-content:center'
-    ].join(';');
-    overlay.innerHTML = `
-      <div style="text-align:center;">
-        <div style="font-size:40px;margin-bottom:16px;animation:pulse 1.5s infinite;">📄</div>
-        <div style="font-size:18px;font-weight:700;color:#0F2D52;">Generating PDF…</div>
-        <div style="font-size:13px;color:#6B7280;margin-top:6px;">${doc.docNumber}</div>
-        <div style="font-size:11px;color:#9CA3AF;margin-top:12px;">Please wait, processing layout...</div>
-      </div>`;
-    document.body.appendChild(overlay);
+    // 2. We don't need a heavy DOM overlay anymore, just a simple toast
+    Utils.showToast('Generating PDF, please wait...', 'info');
 
     /* 3 ─ Generate template HTML and embed base64 images */
     let html = Templates.generateDocumentHTML(doc);
@@ -40,20 +27,8 @@ const PDFExport = {
     if (sig && html.includes('ipro_signature_placeholder')) html = html.replace(/ipro_signature_placeholder/g, sig);
     if (qr && html.includes('ipro_qr_placeholder')) html = html.replace(/ipro_qr_placeholder/g, qr);
 
-    /* 4 ─ Mount IN PLAIN SIGHT but perfectly hidden behind the opaque overlay */
-    // Opacity is exactly 1, display is block. The browser engine MUST render this!
-    const container = document.createElement('div');
-    container.style.cssText = [
-      'position:absolute', 'top:0', 'left:0',
-      'width:794px', 'background:#fff',
-      'z-index:1', 'opacity:1', 'display:block'
-    ].join(';');
-    container.innerHTML = html;
-    document.body.appendChild(container);
-
-    /* 5 ─ Wait heavily for DOM layout, painting, and image decoding */
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-    await new Promise(r => setTimeout(r, 600)); // Crucial delay for webfonts and styles to apply
+    /* 4 ─ Delay to allow the toast to render visually */
+    await new Promise(r => setTimeout(r, 150));
 
     const options = {
       margin:      0,
@@ -77,8 +52,8 @@ const PDFExport = {
     };
 
     try {
-      // Race condition: if html2pdf hangs for more than 10 seconds, throw an error to trigger fallback
-      const pdfPromise = html2pdf().from(container).set(options).save();
+      // Pass the raw HTML string directly to html2pdf, avoiding ALL DOM interference
+      const pdfPromise = html2pdf().from(html).set(options).save();
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error("PDF generation timed out")), 10000)
       );
@@ -92,8 +67,6 @@ const PDFExport = {
       Utils.showToast('PDF failed — opening print dialog.', 'warning');
       this._printFallback(doc, html);
     } finally {
-      if (document.body.contains(container)) document.body.removeChild(container);
-      if (document.body.contains(overlay)) document.body.removeChild(overlay);
       window.scrollTo(0, originalScroll);
     }
   },

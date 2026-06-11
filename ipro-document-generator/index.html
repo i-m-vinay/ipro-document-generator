@@ -316,11 +316,20 @@
 ═══════════════════════════════════════════════════════ -->
 <style>
   @media print {
-    .sidebar, .top-header, .page-header, #toast-container, #global-modal, #slide-panel, #slide-panel-overlay, #mobile-nav-panel { display: none !important; }
-    .main-content { margin-left: 0 !important; }
-    .page-content { padding: 0 !important; }
-    #document-preview-area { box-shadow: none !important; border-radius: 0 !important; }
-    body { background: white !important; }
+    body * { visibility: hidden; }
+    #document-preview-area, #document-preview-area * { visibility: visible; }
+    #document-preview-area {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      margin: 0 !important;
+      padding: 0 !important;
+      box-shadow: none !important; 
+      border-radius: 0 !important;
+      background: white !important;
+    }
+    @page { margin: 0; size: A4 portrait; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   }
 
