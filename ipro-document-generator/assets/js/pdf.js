@@ -1,6 +1,6 @@
 /**
- * I-Pro Solutions — PDF Export v3.0
- * Fixed blank PDF generation issue
+ * I-Pro Solutions — PDF Export v3.1
+ * Bulletproof PDF generation
  */
 
 const PDFExport = {
@@ -10,25 +10,28 @@ const PDFExport = {
     const doc = Storage.getDocumentById(docId);
     if (!doc) { Utils.showToast('Document not found.', 'error'); return; }
 
-    /* 1 ─ Overlay to hide the app while we render */
+    // 1. Scroll to top to prevent html2canvas cropping issues
+    const originalScroll = window.scrollY;
+    window.scrollTo(0, 0);
+
+    // 2. Solid, completely opaque overlay to hide the render process
     const overlay = document.createElement('div');
     overlay.style.cssText = [
-      'position:fixed','inset:0','background:rgba(15,45,82,0.85)',
-      'z-index:9998','display:flex','align-items:center',
-      'justify-content:center','backdrop-filter:blur(4px)',
+      'position:fixed', 'inset:0', 'background:#ffffff',
+      'z-index:9998', 'display:flex', 'align-items:center',
+      'justify-content:center'
     ].join(';');
     overlay.innerHTML = `
-      <div style="background:#fff;padding:28px 48px;border-radius:16px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.35);">
-        <div style="font-size:32px;margin-bottom:12px;">📄</div>
-        <div style="font-size:15px;font-weight:700;color:#0F2D52;">Generating PDF…</div>
-        <div style="font-size:12px;color:#6B7280;margin-top:6px;">${doc.docNumber}</div>
+      <div style="text-align:center;">
+        <div style="font-size:40px;margin-bottom:16px;animation:pulse 1.5s infinite;">📄</div>
+        <div style="font-size:18px;font-weight:700;color:#0F2D52;">Generating PDF…</div>
+        <div style="font-size:13px;color:#6B7280;margin-top:6px;">${doc.docNumber}</div>
+        <div style="font-size:11px;color:#9CA3AF;margin-top:12px;">Please wait, processing layout...</div>
       </div>`;
     document.body.appendChild(overlay);
 
-    /* 2 ─ Generate template HTML */
+    /* 3 ─ Generate template HTML and embed base64 images */
     let html = Templates.generateDocumentHTML(doc);
-
-    /* 3 ─ Force-inline base64 assets to avoid blank image gaps */
     const logo = Storage.getLogo();
     const sig  = Storage.getSignature();
     const qr   = Storage.getQRCode();
@@ -37,31 +40,21 @@ const PDFExport = {
     if (sig && html.includes('ipro_signature_placeholder')) html = html.replace(/ipro_signature_placeholder/g, sig);
     if (qr && html.includes('ipro_qr_placeholder')) html = html.replace(/ipro_qr_placeholder/g, qr);
 
-    /* 4 ─ Mount securely for html2canvas (no display:none, opacity 0.001) */
+    /* 4 ─ Mount IN PLAIN SIGHT but perfectly hidden behind the opaque overlay */
+    // Opacity is exactly 1, display is block. The browser engine MUST render this!
     const container = document.createElement('div');
     container.style.cssText = [
       'position:absolute', 'top:0', 'left:0',
       'width:794px', 'background:#fff',
-      'z-index:-100', 'opacity:0.001'
+      'z-index:1', 'opacity:1', 'display:block'
     ].join(';');
     container.innerHTML = html;
     document.body.appendChild(container);
 
-    /* 5 ─ Wait for layout + all images to fully paint */
+    /* 5 ─ Wait heavily for DOM layout, painting, and image decoding */
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 600)); // Crucial delay for webfonts and styles to apply
 
-    // Extra: wait for any <img> tags that might still be loading
-    const imgs = Array.from(container.querySelectorAll('img'));
-    if (imgs.length) {
-      await Promise.all(imgs.map(img =>
-        img.complete ? Promise.resolve()
-          : new Promise(r => { img.onload = r; img.onerror = r; })
-      ));
-      await new Promise(r => setTimeout(r, 200));
-    }
-
-    /* 6 ─ html2pdf options */
     const options = {
       margin:      0,
       filename:    `${doc.docNumber}.pdf`,
@@ -71,6 +64,8 @@ const PDFExport = {
         useCORS:         true,
         logging:         false,
         letterRendering: true,
+        windowWidth:     794,
+        scrollY:         0,
       },
       jsPDF: {
         unit:        'mm',
@@ -90,9 +85,9 @@ const PDFExport = {
       Utils.showToast('PDF failed — opening print dialog.', 'warning');
       this._printFallback(doc, html);
     } finally {
-      if (document.body.contains(overlay)) {
-        document.body.removeChild(overlay);
-      }
+      if (document.body.contains(container)) document.body.removeChild(container);
+      if (document.body.contains(overlay)) document.body.removeChild(overlay);
+      window.scrollTo(0, originalScroll);
     }
   },
 
