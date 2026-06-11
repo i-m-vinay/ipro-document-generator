@@ -52,8 +52,16 @@ const PDFExport = {
     };
 
     try {
+      // Wrap the HTML to force exactly A4 width in pixels (794px at 96 DPI)
+      // This prevents the PDF from rendering at mobile-width and stretching/zooming the text.
+      const wrappedHtml = `
+        <div style="width: 794px; background: #fff; margin: 0; padding: 0;">
+          ${html}
+        </div>
+      `;
+
       // Pass the raw HTML string directly to html2pdf, avoiding ALL DOM interference
-      const pdfPromise = html2pdf().from(html).set(options).save();
+      const pdfPromise = html2pdf().from(wrappedHtml).set(options).save();
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error("PDF generation timed out")), 10000)
       );

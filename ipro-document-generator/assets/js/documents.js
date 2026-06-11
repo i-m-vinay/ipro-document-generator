@@ -851,8 +851,14 @@ const Documents = {
         throw new Error("html2pdf library missing");
       }
 
+      const wrappedHtml = `
+        <div style="width: 794px; background: #fff; margin: 0; padding: 0;">
+          ${html}
+        </div>
+      `;
+
       // Race condition: prevent infinite hang
-      const pdfPromise = html2pdf().from(html).set({
+      const pdfPromise = html2pdf().from(wrappedHtml).set({
         margin: 0, filename: `${doc.docNumber}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
