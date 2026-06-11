@@ -225,8 +225,19 @@ const Documents = {
                 <input type="date" id="doc-due" class="form-input" value="${doc?.dueDate || Utils.addDays(Utils.todayISO(), 30)}">
               </div>
               <div class="form-group">
-                <label class="form-label">Reference No. / PO No.</label>
-                <input type="text" id="doc-ref" class="form-input" value="${(doc?.reference && doc.reference !== 'undefined') ? doc.reference : ''}" placeholder="e.g. PO-12345 or client reference">
+                <label class="form-label">
+                  Reference No. / PO No.
+                  ${doc?.docNumber
+                    ? `<span style="margin-left:6px; font-size:10px; background:#EFF6FF; color:#2563EB; padding:2px 8px; border-radius:99px; font-weight:600; font-family:monospace;">${doc.docNumber}</span>`
+                    : `<span style="margin-left:6px; font-size:10px; color:#6B7280; font-weight:400;">(auto-assigned on save)</span>`
+                  }
+                </label>
+                <input type="text" id="doc-ref" class="form-input"
+                  value="${(doc?.reference && doc.reference !== 'undefined') ? doc.reference : ''}"
+                  placeholder="${doc?.docNumber ? doc.docNumber : 'Leave blank to auto-use Document No., or type your own'}">
+                <div style="font-size:10px; color:#9CA3AF; margin-top:4px;">
+                  💡 Leave blank to use the Document No. automatically, or type your own PO / reference number.
+                </div>
               </div>
               <div class="form-group sm:col-span-2">
                 <label class="form-label">Remarks / Subject</label>
@@ -643,8 +654,21 @@ const Documents = {
       status: Utils.el('doc-status')?.value || 'draft',
     };
 
+    // Auto-assign reference = docNumber if no reference set
+    if (!doc.reference) {
+      const existingDoc = this.editingId ? Storage.getDocumentById(this.editingId) : null;
+      if (existingDoc?.docNumber) doc.reference = existingDoc.docNumber;
+      // If new doc (no editingId), docNumber will be assigned by Storage.saveDocument — we handle it after save
+    }
+
     const saved = Storage.saveDocument(doc);
     this.editingId = saved.id;
+
+    // For new docs: if reference was blank, set reference = docNumber and re-save
+    if (!saved.reference && saved.docNumber) {
+      saved.reference = saved.docNumber;
+      Storage.saveDocument(saved);
+    }
 
     // Sync to Google Sheets
     GoogleSheets.sync(saved);
@@ -718,7 +742,7 @@ const Documents = {
             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
             Download PDF
           </button>
-          <button onclick="window.print()" class="btn btn-outline">🖨 Print</button>
+          <button onclick="PDFExport.print('${doc.id}')" class="btn btn-outline">🖨 Print</button>
           <!-- Share dropdown -->
           <div style="position:relative; display:inline-block;" id="share-menu-wrap">
             <button onclick="Documents.toggleShareMenu()" class="btn btn-outline" style="background:#25D366; color:#fff; border-color:#25D366; gap:6px;">
@@ -837,47 +861,8 @@ const Documents = {
     Utils.showToast('Generating PDF for sharing...', 'info');
 
     try {
-      let html = Templates.generateDocumentHTML(doc);
-      const logo = Storage.getLogo();
-      const sig  = Storage.getSignature();
-      const qr   = Storage.getQRCode();
-
-      if (logo && html.includes('ipro_logo_placeholder')) html = html.replace(/ipro_logo_placeholder/g, logo);
-      if (sig && html.includes('ipro_signature_placeholder')) html = html.replace(/ipro_signature_placeholder/g, sig);
-      if (qr && html.includes('ipro_qr_placeholder')) html = html.replace(/ipro_qr_placeholder/g, qr);
-
-      // Ensure html2pdf is available
-      if (typeof html2pdf === 'undefined') {
-        throw new Error("html2pdf library missing");
-      }
-
-      const element = document.createElement('div');
-      element.style.width = '794px';
-      element.innerHTML = html;
-
-      // Force browser to decode all base64 images
-      const images = Array.from(element.querySelectorAll('img'));
-      await Promise.all(images.map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => {
-          img.onload = resolve;
-          img.onerror = resolve;
-        });
-      }));
-
-      // Race condition: prevent infinite hang
-      const pdfPromise = html2pdf().from(element).set({
-        margin: 0, filename: `${doc.docNumber}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true }
-      }).outputPdf('blob');
-      
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("PDF generation timed out")), 10000)
-      );
-
-      const pdfBlob = await Promise.race([pdfPromise, timeoutPromise]);
+      // Use the centralised PDFExport.generateBlob which handles image preloading, page-breaks, etc.
+      const pdfBlob = await PDFExport.generateBlob(doc);
 
       const file = new File([pdfBlob], `${doc.docNumber}.pdf`, { type: 'application/pdf' });
 
