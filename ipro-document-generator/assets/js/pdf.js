@@ -28,9 +28,8 @@ const PDFExport = {
     if (qr && html.includes('ipro_qr_placeholder')) html = html.replace(/ipro_qr_placeholder/g, qr);
 
     const element = document.createElement('div');
-    element.style.cssText = 'width:794px; position:absolute; left:-10000px; top:0;';
+    element.style.width = '794px';
     element.innerHTML = html;
-    document.body.appendChild(element);
 
     const options = {
       margin:      0,
@@ -41,23 +40,19 @@ const PDFExport = {
         useCORS:         true,
         logging:         false
       },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
-      pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' }
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true }
     };
 
     try {
-      // Force browser to decode all base64 images before rendering to prevent blank boxes
+      // Force graphics thread to fully decode all base64 images before taking snapshot
       const images = Array.from(element.querySelectorAll('img'));
-      await Promise.all(images.map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => {
-          img.onload = resolve;
-          img.onerror = resolve;
-        });
+      await Promise.all(images.map(async (img) => {
+        try {
+          await img.decode();
+        } catch (e) {
+          console.warn('Image decode failed or not supported:', e);
+        }
       }));
-
-      // Small tick for DOM layout
-      await new Promise(r => setTimeout(r, 50));
 
       const pdfPromise = html2pdf().from(element).set(options).save();
       const timeoutPromise = new Promise((_, reject) => 
@@ -72,9 +67,6 @@ const PDFExport = {
       console.error('[PDF] generation failed:', err);
       Utils.showToast('PDF failed — opening print dialog.', 'warning');
       this._printFallback(doc, html);
-    } finally {
-      if (document.body.contains(element)) document.body.removeChild(element);
-      window.scrollTo(0, originalScroll);
     }
   },
 
