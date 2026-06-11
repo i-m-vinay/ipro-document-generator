@@ -743,7 +743,7 @@ const Documents = {
           <button onclick="Documents.openBuilder('${doc.id}')" class="btn btn-outline">Edit</button>
           <button onclick="PDFExport.download('${doc.id}')" class="btn btn-primary">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-            Download PDF
+            Download Image
           </button>
           <button onclick="PDFExport.print('${doc.id}')" class="btn btn-outline">🖨 Print</button>
           <!-- Share dropdown -->
@@ -861,32 +861,30 @@ const Documents = {
       ].filter(l => l !== undefined).join('\n');
     }
 
-    Utils.showToast('Generating PDF for sharing...', 'info');
+    Utils.showToast('Generating image for sharing…', 'info');
 
     try {
-      // Use the centralised PDFExport.generateBlob which handles image preloading, page-breaks, etc.
-      const pdfBlob = await PDFExport.generateBlob(doc);
+      // generateBlob now returns a PNG image blob
+      const imgBlob = await PDFExport.generateBlob(doc);
+      const filename = `${doc.docNumber}.png`;
+      const file = new File([imgBlob], filename, { type: 'image/png' });
 
-      const file = new File([pdfBlob], `${doc.docNumber}.pdf`, { type: 'application/pdf' });
-
-      // Try native share API if supported (works beautifully on mobile for PDF files)
+      // Try native share API (mobile — shares image file directly)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          title: doc.docNumber,
-          text: msg,
-          files: [file]
-        });
+        await navigator.share({ title: doc.docNumber, text: msg, files: [file] });
         Utils.showToast('Shared successfully!', 'success');
       } else {
-        // Fallback for Desktop web: Download the file automatically, then open WhatsApp/Email
-        const url = URL.createObjectURL(pdfBlob);
+        // Desktop fallback: download image, then open WhatsApp/Email
+        const url = URL.createObjectURL(imgBlob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = file.name;
+        a.download = filename;
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
 
-        Utils.showToast('PDF downloaded! Please attach it manually to your message.', 'warning');
+        Utils.showToast('Image downloaded! Attach it to your message.', 'info');
 
         setTimeout(() => {
           if (method === 'whatsapp') {
@@ -898,7 +896,7 @@ const Documents = {
       }
     } catch (e) {
       console.error('Sharing failed:', e);
-      Utils.showToast('Failed to generate PDF for sharing.', 'error');
+      Utils.showToast('Failed to generate image for sharing.', 'error');
     }
   },
 };
