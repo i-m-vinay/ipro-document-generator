@@ -1,186 +1,179 @@
 /**
- * I-Pro Solutions — PDF Export v3.7
- * Fixes:
- *  - QR code / logo never blank: pre-renders images into hidden real DOM element
- *  - PDF never splits header, table rows, totals block, or signature mid-block
- *  - Print opens proper document (not the whole UI page)
- *  - Reference No. always equals Document No.
+ * I-Pro Solutions — PDF Export v3.9
+ *
+ * Strategy that actually works in all browsers:
+ *  1. Build full document HTML string with images embedded as base64
+ *  2. Create an inner content div (NOT fixed/absolute — just a plain div)
+ *  3. Wrap it in a hidden overlay div briefly attached to document.body
+ *  4. Wait for images to decode
+ *  5. Pass the INNER content div (not the wrapper) to html2pdf — this is the key
+ *  6. Clean up
  */
 
 const PDFExport = {
 
-  /* ─── Shared: build the render-ready element ──────────────────────── */
-  async _buildElement(doc) {
+  /* ─── Build full HTML string with images embedded ──────────────── */
+  _buildHTML(doc) {
     let html = Templates.generateDocumentHTML(doc);
-
-    // Embed base64 images (already inline — these replace placeholder text tokens if any)
     const logo = Storage.getLogo();
     const sig  = Storage.getSignature();
     const qr   = Storage.getQRCode();
     if (logo && html.includes('ipro_logo_placeholder')) html = html.replace(/ipro_logo_placeholder/g, logo);
     if (sig  && html.includes('ipro_signature_placeholder')) html = html.replace(/ipro_signature_placeholder/g, sig);
     if (qr   && html.includes('ipro_qr_placeholder')) html = html.replace(/ipro_qr_placeholder/g, qr);
-
-    // CSS injected into the element that prevents blocks from being split across pages
-    const pageBreakCSS = `
-      <style>
-        * { box-sizing: border-box; }
-        table { border-collapse: collapse; }
-        img { display: block; max-width: 100%; }
-        /* Prevent page-breaks inside key blocks */
-        tr, .document-page > div, thead, tfoot,
-        table thead tr, tbody tr {
-          page-break-inside: avoid !important;
-          break-inside: avoid !important;
-        }
-        /* Keep the totals + bank details block together */
-        [data-pdf-block] {
-          page-break-inside: avoid !important;
-          break-inside: avoid !important;
-        }
-      </style>
-    `;
-
-    // Wrap in a fixed-width container with the CSS
-    // Attach to real DOM at top-left (invisible) — html2canvas requires the element
-    // to be INSIDE the viewport to capture it correctly. visibility:hidden hides it from the user.
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'width:794px; position:fixed; top:0; left:0; visibility:hidden; pointer-events:none; z-index:-9999;';
-    wrapper.innerHTML = pageBreakCSS + html;
-
-    // Attach to real DOM — this is the key step that makes browsers decode images
-    document.body.appendChild(wrapper);
-
-    // Wait for ALL images to fully load and decode
-    const images = Array.from(wrapper.querySelectorAll('img'));
-    await Promise.all(images.map(img => {
-      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-      return new Promise(resolve => {
-        img.onload  = resolve;
-        img.onerror = resolve;
-        // Force reload so browser definitely fires onload
-        const src = img.src;
-        img.src = '';
-        img.src = src;
-      });
-    }));
-
-    // One more repaint tick to let the browser flush
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-    return wrapper;
+    return html;
   },
 
-  /* ─── PUBLIC: download ─────────────────────────────────────────── */
+  /* ─── Attach element to DOM so images decode, then detach ──────── */
+  async _waitForImages(element) {
+    const images = Array.from(element.querySelectorAll('img'));
+    await Promise.all(images.map(img => new Promise(resolve => {
+      if (img.complete && img.naturalWidth > 0) { resolve(); return; }
+      img.onload = img.onerror = resolve;
+    })));
+    // Two animation frames so browser flushes paint
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  },
+
+  /* ─── PDF options ────────────────────────────────────────────── */
+  _opts(filename) {
+    return {
+      margin:      0,
+      filename,
+      image:       { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        scale:       2,
+        useCORS:     true,
+        logging:     false,
+        // Tell html2canvas the full document width so it doesn't crop
+        windowWidth: 794,
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+    };
+  },
+
+  /* ─── PUBLIC: Download PDF ───────────────────────────────────── */
   async download(docId) {
     const doc = Storage.getDocumentById(docId);
     if (!doc) { Utils.showToast('Document not found.', 'error'); return; }
 
+    Utils.showToast('Generating PDF…', 'info');
     window.scrollTo(0, 0);
-    Utils.showToast('Generating PDF, please wait...', 'info');
 
-    let wrapper = null;
+    // Create a simple hidden container
+    const container = document.createElement('div');
+    container.style.cssText = [
+      'position:absolute',
+      'top:0',
+      'left:0',
+      'width:794px',
+      'overflow:hidden',
+      'height:0',         // Zero height — hides it without clipping the content
+      'visibility:hidden',
+      'pointer-events:none',
+      'z-index:-1',
+    ].join(';');
+
+    // The actual content element passed to html2pdf
+    const content = document.createElement('div');
+    content.style.width = '794px';
+    content.innerHTML = this._buildHTML(doc);
+
+    container.appendChild(content);
+    document.body.appendChild(container);
+
     try {
-      wrapper = await this._buildElement(doc);
+      await this._waitForImages(content);
 
-      const options = {
-        margin:      0,
-        filename:    `${doc.docNumber}.pdf`,
-        image:       { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
-        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true }
-      };
-
-      const pdfPromise = html2pdf().from(wrapper).set(options).save();
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('PDF generation timed out')), 15000)
-      );
-
-      await Promise.race([pdfPromise, timeoutPromise]);
-      Utils.showToast(`✓ ${doc.docNumber}.pdf downloaded!`, 'success');
-      Storage.logActivity?.(`PDF downloaded: ${doc.docNumber}`);
-    } catch (err) {
-      console.error('[PDF] generation failed:', err);
-      Utils.showToast('PDF failed — opening print dialog instead.', 'warning');
-      this._printFallback(doc);
-    } finally {
-      if (wrapper && document.body.contains(wrapper)) {
-        document.body.removeChild(wrapper);
-      }
-    }
-  },
-
-  /* ─── PUBLIC: generate blob for sharing ───────────────────────── */
-  async generateBlob(doc) {
-    let wrapper = null;
-    try {
-      wrapper = await this._buildElement(doc);
-
-      const options = {
-        margin:      0,
-        filename:    `${doc.docNumber}.pdf`,
-        image:       { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
-        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true }
-      };
-
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('PDF generation timed out')), 15000)
-      );
-
-      const blob = await Promise.race([
-        html2pdf().from(wrapper).set(options).outputPdf('blob'),
-        timeoutPromise
+      await Promise.race([
+        html2pdf().from(content).set(this._opts(`${doc.docNumber}.pdf`)).save(),
+        new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 20000)),
       ]);
-      return blob;
+
+      Utils.showToast(`✓ ${doc.docNumber}.pdf downloaded!`, 'success');
+    } catch (err) {
+      console.error('[PDF] failed:', err);
+      Utils.showToast('PDF failed — opening print dialog.', 'warning');
+      this._openPrintWindow(doc);
     } finally {
-      if (wrapper && document.body.contains(wrapper)) {
-        document.body.removeChild(wrapper);
-      }
+      document.body.removeChild(container);
     }
   },
 
-  /* ─── Print fallback / direct print ────────────────────────────── */
-  _printFallback(doc) {
-    let html = Templates.generateDocumentHTML(doc);
-    const logo = Storage.getLogo();
-    const sig  = Storage.getSignature();
-    const qr   = Storage.getQRCode();
-    if (logo && html.includes('ipro_logo_placeholder')) html = html.replace(/ipro_logo_placeholder/g, logo);
-    if (sig  && html.includes('ipro_signature_placeholder')) html = html.replace(/ipro_signature_placeholder/g, sig);
-    if (qr   && html.includes('ipro_qr_placeholder')) html = html.replace(/ipro_qr_placeholder/g, qr);
+  /* ─── PUBLIC: Generate Blob (for sharing) ───────────────────── */
+  async generateBlob(doc) {
+    const container = document.createElement('div');
+    container.style.cssText = [
+      'position:absolute', 'top:0', 'left:0',
+      'width:794px', 'overflow:hidden', 'height:0',
+      'visibility:hidden', 'pointer-events:none', 'z-index:-1',
+    ].join(';');
 
-    const win = window.open('', '_blank', 'width=900,height=750');
-    if (!win) { Utils.showToast('Pop-ups blocked — allow pop-ups and retry.', 'error'); return; }
-    win.document.write(`<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8">
-<title>${doc.docNumber}</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  html,body{width:794px;background:#fff;font-family:'Inter',Arial,sans-serif}
-  @media print{
-    @page{margin:0;size:A4}
-    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-    tr, thead, tbody tr, table, .document-page > div {
-      page-break-inside: avoid !important;
-      break-inside: avoid !important;
+    const content = document.createElement('div');
+    content.style.width = '794px';
+    content.innerHTML = this._buildHTML(doc);
+
+    container.appendChild(content);
+    document.body.appendChild(container);
+
+    try {
+      await this._waitForImages(content);
+      return await Promise.race([
+        html2pdf().from(content).set(this._opts(`${doc.docNumber}.pdf`)).outputPdf('blob'),
+        new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 20000)),
+      ]);
+    } finally {
+      document.body.removeChild(container);
     }
-  }
-  table{border-collapse:collapse}img{max-width:100%;display:block}
-</style></head><body style="margin:0;padding:0;background:#fff;">
-${html}</body></html>`);
-    win.document.close();
-    win.focus();
-    // 2.5s gives Google Fonts + base64 images time to decode before the print dialog opens
-    setTimeout(() => { try { win.print(); } catch(e) {} }, 2500);
   },
 
-  /* ─── Open print dialog directly ───────────────────────────────── */
+  /* ─── PUBLIC: Print ──────────────────────────────────────────── */
   print(docId) {
     const doc = Storage.getDocumentById(docId);
     if (!doc) { Utils.showToast('Document not found.', 'error'); return; }
-    this._printFallback(doc);
+    this._openPrintWindow(doc);
+  },
+
+  /* ─── Internal: open a clean print window ────────────────────── */
+  _openPrintWindow(doc) {
+    const html = this._buildHTML(doc);
+    const win = window.open('', '_blank');
+    if (!win) { Utils.showToast('Pop-ups are blocked — please allow and retry.', 'error'); return; }
+
+    win.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${doc.docNumber || 'Document'}</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 794px; background: #fff; font-family: 'Inter', Arial, sans-serif; }
+    img { display: block; max-width: 100%; }
+    table { border-collapse: collapse; width: 100%; }
+    @media print {
+      @page { margin: 0; size: A4; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      tr, thead, tfoot, .document-page > div {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:#fff;">
+${html}
+<script>
+  // Wait for all images and fonts to load, then print
+  window.addEventListener('load', function() {
+    setTimeout(function() { window.print(); }, 1000);
+  });
+  // Fallback in case load already fired
+  setTimeout(function() { window.print(); }, 3000);
+<\/script>
+</body>
+</html>`);
+    win.document.close();
   },
 };
 
