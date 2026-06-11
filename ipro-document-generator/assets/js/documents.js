@@ -852,8 +852,22 @@ const Documents = {
       }
 
       const element = document.createElement('div');
-      element.style.width = '794px';
+      element.style.cssText = 'width:794px; position:absolute; left:-10000px; top:0;';
       element.innerHTML = html;
+      document.body.appendChild(element);
+
+      // Force browser to decode all base64 images
+      const images = Array.from(element.querySelectorAll('img'));
+      await Promise.all(images.map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      }));
+
+      // Small tick for DOM layout
+      await new Promise(r => setTimeout(r, 50));
 
       // Race condition: prevent infinite hang
       const pdfPromise = html2pdf().from(element).set({
@@ -902,6 +916,8 @@ const Documents = {
     } catch (e) {
       console.error('Sharing failed:', e);
       Utils.showToast('Failed to generate PDF for sharing.', 'error');
+    } finally {
+      if (document.body.contains(element)) document.body.removeChild(element);
     }
   },
 };

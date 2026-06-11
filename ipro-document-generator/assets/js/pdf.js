@@ -28,8 +28,9 @@ const PDFExport = {
     if (qr && html.includes('ipro_qr_placeholder')) html = html.replace(/ipro_qr_placeholder/g, qr);
 
     const element = document.createElement('div');
-    element.style.width = '794px';
+    element.style.cssText = 'width:794px; position:absolute; left:-10000px; top:0;';
     element.innerHTML = html;
+    document.body.appendChild(element);
 
     const options = {
       margin:      0,
@@ -45,6 +46,19 @@ const PDFExport = {
     };
 
     try {
+      // Force browser to decode all base64 images before rendering to prevent blank boxes
+      const images = Array.from(element.querySelectorAll('img'));
+      await Promise.all(images.map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      }));
+
+      // Small tick for DOM layout
+      await new Promise(r => setTimeout(r, 50));
+
       const pdfPromise = html2pdf().from(element).set(options).save();
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error("PDF generation timed out")), 10000)
@@ -59,6 +73,7 @@ const PDFExport = {
       Utils.showToast('PDF failed — opening print dialog.', 'warning');
       this._printFallback(doc, html);
     } finally {
+      if (document.body.contains(element)) document.body.removeChild(element);
       window.scrollTo(0, originalScroll);
     }
   },
