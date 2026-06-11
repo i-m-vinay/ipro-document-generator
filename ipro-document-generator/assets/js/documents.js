@@ -636,29 +636,32 @@ const Documents = {
     const client = Storage.getClientById(clientId);
     const docType = Utils.el('doc-type')?.value || 'quotation';
 
+    // Fetch existing doc so we can PRESERVE docNumber, createdAt etc. on edits
+    const existingDoc = this.editingId ? Storage.getDocumentById(this.editingId) : null;
+
     const doc = {
-      id: this.editingId || null,
+      id:            this.editingId || null,
+      docNumber:     existingDoc?.docNumber || null,   // ← CRITICAL: preserve on edit
+      createdAt:     existingDoc?.createdAt || null,   // ← preserve original creation date
       type: docType,
       clientId,
-      clientName: client?.name || '',
+      clientName:    client?.name || '',
       clientCompany: client?.company || '',
-      date: Utils.el('doc-date')?.value || Utils.todayISO(),
-      dueDate: Utils.el('doc-due')?.value || '',
+      date:          Utils.el('doc-date')?.value || Utils.todayISO(),
+      dueDate:       Utils.el('doc-due')?.value || '',
       reference:     (Utils.el('doc-ref')?.value || '').trim().replace(/^undefined$/i, ''),
-      remarks: Utils.el('doc-remarks')?.value || '',
-      terms: Utils.el('doc-terms')?.value || '',
+      remarks:       Utils.el('doc-remarks')?.value || '',
+      terms:         Utils.el('doc-terms')?.value || '',
       internalNotes: Utils.el('doc-internal')?.value || '',
-      lineItems: this.lineItems.filter(i => i.name.trim()),
-      totals: this._totals || {},
-      gstMode: this.gstMode,
-      status: Utils.el('doc-status')?.value || 'draft',
+      lineItems:     this.lineItems.filter(i => i.name.trim()),
+      totals:        this._totals || {},
+      gstMode:       this.gstMode,
+      status:        Utils.el('doc-status')?.value || 'draft',
     };
 
-    // Auto-assign reference = docNumber if no reference set
-    if (!doc.reference) {
-      const existingDoc = this.editingId ? Storage.getDocumentById(this.editingId) : null;
-      if (existingDoc?.docNumber) doc.reference = existingDoc.docNumber;
-      // If new doc (no editingId), docNumber will be assigned by Storage.saveDocument — we handle it after save
+    // Auto-assign reference = docNumber if no reference set (for existing docs)
+    if (!doc.reference && existingDoc?.docNumber) {
+      doc.reference = existingDoc.docNumber;
     }
 
     const saved = Storage.saveDocument(doc);

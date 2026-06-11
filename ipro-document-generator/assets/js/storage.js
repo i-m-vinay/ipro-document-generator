@@ -138,15 +138,23 @@ const Storage = {
   saveDocument(doc) {
     const docs = this.getDocuments();
     if (!doc.id) {
-      doc.id = this.generateId('DOC');
+      doc.id        = this.generateId('DOC');
       doc.docNumber = this.generateDocNumber(doc.type);
       doc.createdAt = new Date().toISOString();
-      doc.status = doc.status || 'draft';
+      doc.status    = doc.status || 'draft';
       docs.push(doc);
       this.logActivity(`Created ${doc.type} ${doc.docNumber}`);
     } else {
       const idx = docs.findIndex(d => d.id === doc.id);
       if (idx !== -1) {
+        // Safety guard: if docNumber was wiped by a previous bug, restore it
+        if (!doc.docNumber || doc.docNumber === 'undefined') {
+          doc.docNumber = docs[idx].docNumber || this.generateDocNumber(doc.type);
+        }
+        // Safety guard: preserve original createdAt
+        if (!doc.createdAt) {
+          doc.createdAt = docs[idx].createdAt;
+        }
         doc.updatedAt = new Date().toISOString();
         docs[idx] = doc;
         this.logActivity(`Updated ${doc.type} ${doc.docNumber}`);

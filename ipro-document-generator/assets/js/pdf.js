@@ -42,8 +42,10 @@ const PDFExport = {
     `;
 
     // Wrap in a fixed-width container with the CSS
+    // Attach to real DOM at top-left (invisible) — html2canvas requires the element
+    // to be INSIDE the viewport to capture it correctly. visibility:hidden hides it from the user.
     const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'width:794px; position:fixed; top:-99999px; left:-99999px; z-index:-1; visibility:hidden;';
+    wrapper.style.cssText = 'width:794px; position:fixed; top:0; left:0; visibility:hidden; pointer-events:none; z-index:-9999;';
     wrapper.innerHTML = pageBreakCSS + html;
 
     // Attach to real DOM — this is the key step that makes browsers decode images
@@ -170,9 +172,8 @@ const PDFExport = {
 ${html}</body></html>`);
     win.document.close();
     win.focus();
-    // Wait for fonts + images to load before printing
-    win.onload = () => setTimeout(() => win.print(), 800);
-    setTimeout(() => win.print(), 2000); // fallback
+    // 2.5s gives Google Fonts + base64 images time to decode before the print dialog opens
+    setTimeout(() => { try { win.print(); } catch(e) {} }, 2500);
   },
 
   /* ─── Open print dialog directly ───────────────────────────────── */

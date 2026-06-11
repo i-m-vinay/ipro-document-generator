@@ -172,6 +172,9 @@ const App = {
     // Initialize default services if none exist
     Storage.getServices();
 
+    // ── One-time data repair: fix any docs with missing/undefined docNumber ──
+    this._repairDocNumbers();
+
     this.updateLogoInNav();
     this.navigate('dashboard');
     this.initGlobalSearch();
@@ -315,6 +318,32 @@ const App = {
         panel.classList.add('hidden');
       }
     });
+  },
+  /* ─── Startup repair: fix docs with broken/missing docNumber ──── */
+  _repairDocNumbers() {
+    try {
+      const docs = Storage.getDocuments();
+      let repaired = false;
+      docs.forEach(doc => {
+        if (!doc.docNumber || doc.docNumber === 'undefined' || doc.docNumber === 'null') {
+          doc.docNumber = Storage.generateDocNumber(doc.type || 'quotation');
+          if (!doc.reference) doc.reference = doc.docNumber;
+          repaired = true;
+          console.info(`[Repair] Fixed missing docNumber for doc id: ${doc.id} → ${doc.docNumber}`);
+        }
+        // Also fix reference = undefined
+        if (!doc.reference || doc.reference === 'undefined') {
+          doc.reference = doc.docNumber;
+          repaired = true;
+        }
+      });
+      if (repaired) {
+        Storage.set('ipro_documents', docs);
+        console.info('[Repair] Document data repaired and saved.');
+      }
+    } catch (e) {
+      console.warn('[Repair] Could not repair doc numbers:', e);
+    }
   },
 };
 
