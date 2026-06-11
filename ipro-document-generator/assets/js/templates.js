@@ -1,12 +1,13 @@
 /**
- * I-Pro Solutions - Document Templates Module (v3)
+ * I-Pro Solutions - Document Templates v3.0
  *
- * Changes:
- *  - QR code displayed bottom-right of document
- *  - Signature image replaces blank signature box
- *  - Electronic document note replaces manual signature section
- *  - Government Fee rows styled differently (no GST, blue label)
- *  - Blank signature box REMOVED
+ * v3.0 features:
+ *  - Govt Fee column (conditional — only shown when any row has govt fee > 0)
+ *  - Govt Fees total line in summary breakdown
+ *  - QR code displayed bottom-right next to bank details
+ *  - Authorised signature image above signatory block
+ *  - Electronic document disclaimer (replaces blank signature box)
+ *  - Reference / PO No. never shows 'undefined'
  */
 
 const Templates = {

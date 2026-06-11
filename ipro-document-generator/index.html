@@ -3,10 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="I-Pro Solutions Business Document Generator — Create professional Quotations, Proforma Invoices and Tax Invoices for IP, Trademark, Copyright, Patent and Legal services.">
+  <!-- I-Pro Solutions Document Generator v3.0 | Built: 2026-06-11 -->
+  <meta name="description" content="I-Pro Solutions Business Document Generator v3.0 — Quotations, Proforma Invoices and Tax Invoices for IP, Trademark, Copyright, Patent and Legal services.">
   <meta name="keywords" content="I-Pro Solutions, document generator, quotation, invoice, trademark, copyright, patent, IP services">
   <meta name="robots" content="noindex, nofollow">
-  <title>I-Pro Solutions — Document Generator</title>
+  <title>I-Pro Solutions — Document Generator v3.0</title>
+
+  <!-- Auto Hard Refresh on Deployment -->
+  <script>
+    const APP_VERSION = 'v3.0';
+    const storedVersion = localStorage.getItem('ipro_app_version');
+    if (storedVersion !== APP_VERSION) {
+      localStorage.setItem('ipro_app_version', APP_VERSION);
+      window.location.reload(true); // Force hard refresh
+    }
+  </script>
 
   <!-- Favicon inline SVG -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230F2D52'/><text x='50%' y='60%' text-anchor='middle' font-family='Inter,sans-serif' font-weight='900' font-size='18' fill='white'>iP</text></svg>">
@@ -25,9 +36,40 @@
 <body>
 
 <!-- ═══════════════════════════════════════════════════════
+     LOGIN OVERLAY
+═══════════════════════════════════════════════════════ -->
+<div id="login-overlay" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0F2D52;z-index:99999;display:flex;align-items:center;justify-content:center;">
+  <div style="background:#fff;padding:40px;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,0.5);width:100%;max-width:400px;text-align:center;">
+    <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:24px;">
+      <div style="background:#0F2D52;border-radius:10px;padding:8px 12px;font-size:24px;font-weight:900;color:#fff;font-family:'Inter',sans-serif;">
+        i<span style="color:#F97316">P</span>
+      </div>
+      <div style="text-align:left;">
+        <div style="font-weight:bold;font-size:18px;color:#0F2D52;">I-Pro Solutions</div>
+        <div style="font-size:12px;color:#6B7280;">Secure Access</div>
+      </div>
+    </div>
+    
+    <div id="login-error" style="color:#EF4444;font-size:14px;margin-bottom:16px;display:none;">Invalid credentials.</div>
+    
+    <form id="login-form" onsubmit="App.login(event)" style="display:flex;flex-direction:column;gap:16px;text-align:left;">
+      <div>
+        <label style="font-size:14px;font-weight:600;color:#374151;margin-bottom:6px;display:block;">Username</label>
+        <input type="text" id="login-username" required style="width:100%;padding:10px 14px;border:1px solid #D1D5DB;border-radius:8px;font-size:15px;outline:none;" placeholder="Enter username">
+      </div>
+      <div>
+        <label style="font-size:14px;font-weight:600;color:#374151;margin-bottom:6px;display:block;">Password</label>
+        <input type="password" id="login-password" required style="width:100%;padding:10px 14px;border:1px solid #D1D5DB;border-radius:8px;font-size:15px;outline:none;" placeholder="Enter password">
+      </div>
+      <button type="submit" style="background:#2563EB;color:#fff;padding:12px;border:none;border-radius:8px;font-weight:600;font-size:15px;cursor:pointer;margin-top:8px;">Sign In</button>
+    </form>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
      APP LAYOUT
 ═══════════════════════════════════════════════════════ -->
-<div class="app-layout">
+<div class="app-layout" id="main-app" style="display:none;">
 
   <!-- ─── SIDEBAR ───────────────────────────────────────── -->
   <aside class="sidebar" id="sidebar">
@@ -295,17 +337,17 @@
 <!-- ═══════════════════════════════════════════════════════
      SCRIPTS (order matters!)
 ═══════════════════════════════════════════════════════ -->
-<script src="assets/js/storage.js"></script>
-<script src="assets/js/utils.js"></script>
-<script src="assets/js/logo-loader.js"></script>
-<script src="assets/js/google-sheets.js"></script>
-<script src="assets/js/templates.js"></script>
-<script src="assets/js/pdf.js"></script>
-<script src="assets/js/clients.js"></script>
-<script src="assets/js/services.js"></script>
-<script src="assets/js/documents.js"></script>
-<script src="assets/js/settings.js"></script>
-<script src="assets/js/app.js"></script>
+<script src="assets/js/storage.js?v=2.0"></script>
+<script src="assets/js/utils.js?v=2.0"></script>
+<script src="assets/js/logo-loader.js?v=2.0"></script>
+<script src="assets/js/google-sheets.js?v=2.0"></script>
+<script src="assets/js/templates.js?v=2.0"></script>
+<script src="assets/js/pdf.js?v=2.0"></script>
+<script src="assets/js/clients.js?v=2.0"></script>
+<script src="assets/js/services.js?v=2.0"></script>
+<script src="assets/js/documents.js?v=2.0"></script>
+<script src="assets/js/settings.js?v=2.0"></script>
+<script src="assets/js/app.js?v=2.0"></script>
 
 </body>
 </html>

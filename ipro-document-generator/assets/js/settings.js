@@ -1,6 +1,7 @@
 /**
- * I-Pro Solutions - Settings Module
- * Brand settings, logo upload, and configuration
+ * I-Pro Solutions - Settings Module v3.0
+ * Brand settings, logo/signature/QR upload, full backup export/import
+ * Fixes: clearAllData now wipes ALL keys including signature and QR code
  */
 
 const Settings = {

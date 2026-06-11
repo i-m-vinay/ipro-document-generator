@@ -1,6 +1,6 @@
 /**
- * I-Pro Solutions - Utility Functions
- * Number-to-words, currency formatting, date helpers
+ * I-Pro Solutions - Utility Functions v3.0
+ * Number-to-words, currency formatting, date helpers, modal, toast
  */
 
 const Utils = {

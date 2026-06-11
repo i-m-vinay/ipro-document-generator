@@ -1,6 +1,6 @@
 /**
- * I-Pro Solutions - Services Module (v2)
- * Handles Service Master CRUD + Duplicate + CSV Import/Export
+ * I-Pro Solutions - Services Module v3.0
+ * Service Master CRUD + Duplicate + CSV Import/Export, auto-refresh builder
  */
 
 const Services = {
@@ -263,6 +263,9 @@ const Services = {
     Storage.saveService(service);
     App.closeSlidePanel();
     this.render();
+    if (App.currentView === 'builder' && window.Documents) {
+      Documents.renderBuilder(); // Update dropdowns instantly
+    }
     Utils.showToast(id ? 'Service updated!' : 'Service added!', 'success');
   },
 

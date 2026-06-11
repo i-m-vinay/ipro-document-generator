@@ -1,6 +1,7 @@
 /**
- * I-Pro Solutions - Storage Module
+ * I-Pro Solutions - Storage Module v3.0
  * Handles all LocalStorage CRUD operations
+ * Keys: clients, services, documents, settings, logo, signature, QR code
  */
 
 const STORAGE_KEYS = {

@@ -1,6 +1,6 @@
 /**
- * I-Pro Solutions - Main Application
- * Router, Dashboard, Navigation, Dark Mode
+ * I-Pro Solutions - Main Application v3.0
+ * Router, Dashboard, Navigation, Dark Mode, Global Search, Login Overlay
  */
 
 const Dashboard = {
@@ -154,6 +154,16 @@ const App = {
   slidePanelOpen: false,
 
   init() {
+    // Check login state
+    if (sessionStorage.getItem('ipro_logged_in') !== 'true') {
+      document.getElementById('login-overlay').style.display = 'flex';
+      document.getElementById('main-app').style.display = 'none';
+      return;
+    } else {
+      document.getElementById('login-overlay').style.display = 'none';
+      document.getElementById('main-app').style.display = 'flex';
+    }
+
     // Dark mode
     if (Storage.getDarkMode()) {
       document.documentElement.classList.add('dark');
@@ -167,7 +177,23 @@ const App = {
     this.initGlobalSearch();
     this.initDarkMode();
     this.initMobileNav();
+    this.initMobileNav();
     Dashboard.render();
+  },
+
+  login(e) {
+    e.preventDefault();
+    const user = document.getElementById('login-username').value;
+    const pass = document.getElementById('login-password').value;
+    const err  = document.getElementById('login-error');
+
+    if (user === 'iprosolutionsmumbai' && pass === '1Billion#') {
+      sessionStorage.setItem('ipro_logged_in', 'true');
+      err.style.display = 'none';
+      this.init(); // Continue initialization
+    } else {
+      err.style.display = 'block';
+    }
   },
 
   navigate(view) {

@@ -1,6 +1,7 @@
 /**
- * I-Pro Solutions - Documents Module
- * Core document builder, history, and management
+ * I-Pro Solutions - Documents Module v3.0
+ * Builder: Govt Fee column, Duplicate, Share (WhatsApp/Email)
+ * Fixes: Reference No. never undefined, PDF cache-bust
  */
 
 const Documents = {

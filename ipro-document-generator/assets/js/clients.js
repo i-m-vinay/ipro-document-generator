@@ -1,6 +1,6 @@
 /**
- * I-Pro Solutions - Clients Module
- * Handles Client Master CRUD operations and UI
+ * I-Pro Solutions - Clients Module v3.0
+ * Client Master CRUD, search, state selector, auto-refresh builder
  */
 
 const Clients = {
@@ -194,6 +194,9 @@ const Clients = {
     Storage.saveClient(client);
     App.closeSlidePanel();
     this.render();
+    if (App.currentView === 'builder' && window.Documents) {
+      Documents.renderBuilder(); // Update dropdowns instantly
+    }
     Utils.showToast(id ? 'Client updated successfully!' : 'Client added successfully!', 'success');
   },
 
